@@ -15,8 +15,12 @@ h1, h2 {
     text-align: center;
     font-weight: bold;
 }
+input {
+    display: block;
+    margin-bottom: 15px; 
+    padding: 8px;
+}
 
-/* Tarjetas estilizadas */
 .card {
     background: #ffffff;
     border-radius: 8px;
@@ -30,7 +34,6 @@ h1, h2 {
     margin-bottom: 10px;
 }
 
-/* Inputs personalizados */
 .form-control {
     border: 2px solid #ddd;
     border-radius: 5px;
@@ -43,7 +46,7 @@ h1, h2 {
     box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
 }
 
-/* Botones personalizados */
+
 .btn {
     width: 100%;
     font-size: 15px;
@@ -72,7 +75,6 @@ h1, h2 {
     border: none;
 }
 
-/* Mensajes de estado */
 .text-success {
     font-size: 14px;
     font-weight: bold;

@@ -20,6 +20,13 @@ app.use(bodyParser.urlencoded({
 }))
 app.use(express.static('public'))
 
+function etiqueta (texto) {
+    return /<[^>]+>/.test(texto); }
+function validarTexto(texto) {
+    return /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]{1,30}$/.test(texto);
+}
+
+
 app.post('/agregarUsuario',(req,res)=>{
 
         let nombre=req.body.nombre
@@ -30,6 +37,15 @@ app.post('/agregarUsuario',(req,res)=>{
         let artista = req.body.artista
         let materia = req.body.materia
         let profe = req.body.profe
+
+        edad = parseInt(edad);
+        if(etiqueta(nombre)||etiqueta(pelicula)||etiqueta(deporte)||etiqueta(cancion)||etiqueta(artista)||etiqueta(materia)
+            ||etiqueta(profe)||isNaN(edad)){
+            return res.status(400).send({message:"Datos Incorrectos"});}
+        
+        if(!validarTexto(nombre)||!validarTexto(pelicula)||!validarTexto(deporte)||!validarTexto(cancion)||!validarTexto(artista)
+        ||!validarTexto(materia)||!validarTexto(profe)){
+            return res.status(400).send({message:"Solo puedes ingresar texto de entre 1 y 30 caracteres"});}
 
         con.query('INSERT INTO usuario (nombre,edad,pelicula,deporte,cancion,artista,materia,profe) VALUES (?,?,?,?,?,?,?,?)', [nombre,edad,pelicula,deporte,cancion,artista,materia,profe], (err, respuesta, fields) => {
             if (err) {
@@ -55,6 +71,12 @@ app.get('/obtenerUsuario',(req,res)=>{
 })
 app.put('/obtenerUnUsuario',(req,res)=>{
     let id=req.body.id
+    if (!id) {
+        return res.status(400).send({ message: "Faltan parámetros" });
+    }
+    if (isNaN(id)) {
+        return res.status(400).send({ message: "No intentes adulterar la solicitud" });
+    }
     con.query('SELECT nombre, edad, pelicula, deporte, cancion, artista, materia, profe from usuario WHERE id= (?)',[id], (err, respuesta, fields) => {
         if (err) {
             console.log("Error al conectar", err);
@@ -76,6 +98,16 @@ app.put('/editarUsuario',(req,res)=>{
     let artista = req.body.artista
     let materia = req.body.materia
     let profe = req.body.profe
+
+    if(!id ||!nombre ||!edad ||!pelicula ||!deporte ||!cancion ||!artista ||!materia ||!profe){
+        return res.status(400).send({ message: "Faltan parámetros" });
+    }
+
+    if(isNaN(id)|| etiqueta(nombre)||etiqueta(pelicula)||etiqueta(deporte)||etiqueta(cancion)||etiqueta(artista)||etiqueta(materia)
+        ||etiqueta(profe)||isNaN(edad)||!validarTexto(nombre)||!validarTexto(pelicula)||!validarTexto(deporte)||!validarTexto(cancion)||!validarTexto(artista)
+    ||!validarTexto(materia)||!validarTexto(profe)){
+        return res.status(400).send({ message: "no intente adulterar los parametros" });
+    }
     con.query('SELECT nombre,edad,pelicula,deporte,cancion,artista,materia,profe FROM usuario WHERE id=(?)',[id] , (error, response,campos) => {
         if (error) {
             console.log("Error al conectar", err);
@@ -97,6 +129,11 @@ app.put('/editarUsuario',(req,res)=>{
 })
 app.delete('/BorrarUnUsuario',(req,res)=>{
     let id=req.body.id
+
+    if (!id||isNaN(id)) {
+        return res.status(400).send({ message: "Faltan parámetros o el id no es un número" });
+    }
+
     con.query('DELETE usuario FROM usuario WHERE id =(?)',[id], (err, respuesta, fields) => {
         if (err) {
             console.log("Error al conectar", err);
@@ -109,6 +146,7 @@ app.delete('/BorrarUnUsuario',(req,res)=>{
 })
 
 app.delete('/BorrarUsuarios',(req,res)=>{
+    
     con.query('DELETE usuario FROM usuario;', (err, respuesta, fields) => {
         if (err) {
             console.log("Error al conectar", err);
