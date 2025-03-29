@@ -7,7 +7,7 @@ dotenv.config()
 var con=mysql.createConnection({
     host:"localhost",
     user:"root",
-    password:"Marmolejo01",
+    password:"n0m3l0",
     database:"6IV8",
     port:3306
 })
