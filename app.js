@@ -1,8 +1,9 @@
 const express = require("express")
+const sesion = require("express-session")
 const dotenv=require("dotenv")
 const mysql= require("mysql2")
 var bodyParser=require('body-parser')
-var app=express()
+const app=express()
 dotenv.config()
 var con=mysql.createConnection({
     host:"localhost",
@@ -19,6 +20,14 @@ app.use(bodyParser.urlencoded({
     extended:true
 }))
 app.use(express.static('public'))
+
+app.use(
+    sesion({
+        secret: 'secret',
+        resave: false,
+        saveUninitialized: false,
+    })
+)
 
 function etiqueta (texto) {
     return /<[^>]+>/.test(texto); }
@@ -157,6 +166,13 @@ app.delete('/BorrarUsuarios',(req,res)=>{
     });
 
 })
+
+//Sesiones ekisde
+app.get('/setSesion',(req,res)=>{
+    req.session.nombre="Arturito";
+    res.send('Sesion data set');
+})
+
 app.listen(3000,()=>{
     console.log('Servidor escuchando en el puerto 3000')
 })
