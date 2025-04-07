@@ -4,11 +4,13 @@ const dotenv=require("dotenv")
 const mysql= require("mysql2")
 var bodyParser=require('body-parser')
 const app=express()
+const controlador = require("./controller/authentication.controllers.js");
+
 dotenv.config()
 var con=mysql.createConnection({
     host:"localhost",
     user:"root",
-    password:"n0m3l0",
+    password:"Marmolejo01",
     database:"6IV8",
     port:3306
 })
@@ -19,7 +21,18 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({
     extended:true
 }))
-app.use(express.static('public'))
+
+//Configuracion de express 
+
+app.use(express.static(__dirname + '/public'));
+
+//RUTAS
+app.get('/', (req, res) => { res.sendFile(__dirname + '/pages/index.html')})
+app.get('/Registro', (req, res) => { res.sendFile(__dirname + '/pages/Registro.html')})
+app.post('/api/register',controlador.register)
+app.post('/api/login',controlador.login)
+
+
 
 app.use(
     sesion({
