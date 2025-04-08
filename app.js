@@ -3,6 +3,7 @@ const sesion = require("express-session")
 const dotenv=require("dotenv")
 const mysql= require("mysql2")
 var bodyParser=require('body-parser')
+const path = require('path')
 const app=express()
 const controlador = require("./controller/authentication.controllers.js");
 
@@ -10,7 +11,7 @@ dotenv.config()
 var con=mysql.createConnection({
     host:"localhost",
     user:"root",
-    password:"Marmolejo01",
+    password:"n0m3l0",
     database:"6IV8",
     port:3306
 })
@@ -24,14 +25,14 @@ app.use(bodyParser.urlencoded({
 
 //Configuracion de express 
 
-app.use(express.static(__dirname + '/public'));
+app.use(express.static(path.join(__dirname, 'pages')));
 
 //RUTAS
 app.get('/', (req, res) => { res.sendFile(__dirname + '/pages/index.html')})
 app.get('/Registro', (req, res) => { res.sendFile(__dirname + '/pages/Registro.html')})
+app.get('/Crud', (req, res) => { res.sendFile(__dirname + '/pages/Crud.html')})
 app.post('/api/register',controlador.register)
-app.post('/api/login',controlador.login)
-
+app.post('/api/login',controlador.login)    
 
 
 app.use(
@@ -179,6 +180,8 @@ app.delete('/BorrarUsuarios',(req,res)=>{
     });
 
 })
+
+
 
 //Sesiones ekisde
 app.get('/setSesion',(req,res)=>{

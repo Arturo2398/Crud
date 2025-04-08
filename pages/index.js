@@ -1,3 +1,4 @@
+console.log("Error");
 document.getElementById("create").addEventListener("submit", async(event)=>{
     event.preventDefault();
     let response = await fetch("/agregarUsuario", {

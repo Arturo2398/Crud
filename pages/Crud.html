@@ -88,6 +88,8 @@
 </head>
 <body>
     <div class="container">
+        <h1>Gestión de Usuarios</h1>
+        
         <div class="card p-4 mb-3">
             <h2>Crear Registro de Usuario</h2>
             <form id="create">
@@ -99,13 +101,72 @@
                     <input type="text" class="form-control" name="cancion" id="cancion" placeholder="Cancion favorita "style="margin-top:10px ;">
                     <input type="text" class="form-control" name="artista" id="artista" placeholder="Artista favortio "style="margin-top:10px ;">
                     <input type="text" class="form-control" name="materia" id="materia" placeholder="Materia favorita"style="margin-top:10px ;">
-                    <input type="text" class="form-control" name="profe" id="profe" placeholder="Contraseña "style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="profe" id="profe" placeholder="Contraseña"style="margin-top:10px ;">
 
                     
                 <p id='nuevoUsuario' class="text-success"></p>
                 <button type="submit" class="btn btn-primary">Crear</button>
 
                 </div>
+            </form>
+        </div>
+
+        <div class="card p-4 mb-3">
+            <h2>Mostrar Registros de Usuario</h2>
+            <form id="read">
+                <p id='usuarios'></p>
+                <button type="submit" class="btn btn-info">Leer</button>
+            </form>
+        </div>
+
+        <div class="card p-4 mb-3">
+            <h2>Mostrar Registro con ID</h2>
+            <form id="readOne">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="id" id="id" placeholder="Id del registro">
+                </div>
+                <p id='usuario'></p>
+                <button type="submit" class="btn btn-info">Leer Uno</button>
+            </form>
+        </div>
+
+        <div class="card p-4 mb-3">
+            <h2>Editar Registro de Usuario</h2>
+            <form id="update">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="id" id="id" placeholder="Id del registro">
+                </div>
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="nombre" id="nombre" placeholder="Nombre nuevo" >
+                    <input type="num" class="form-control" name="edad" id="edad" placeholder="Edad nueva" style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="pelicula" id="pelicula" placeholder="Pelicula favortia nueva" style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="deporte" id="deporte" placeholder="Deporte favorito nuevo " style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="cancion" id="cancion" placeholder="Cancion favorita nueva" style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="artista" id="artista" placeholder="Artista favortio nuev@" style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="materia" id="materia" placeholder="Materia favorita nueva " style="margin-top:10px ;">
+                    <input type="text" class="form-control" name="profe" id="profe" placeholder="Nueva contraseña" style="margin-top:10px ;">
+                </div>
+                <p id='UsuarioCambiado'></p>
+                <button type="submit" class="btn btn-warning">Modificar</button>
+            </form>
+        </div>
+
+        <div class="card p-4 mb-3">
+            <h2>Borrar Registro de Usuario</h2>
+            <form id="deleteOne">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="id" id="id" placeholder="Id del registro">
+                </div>
+                <p id='UsuarioBorrado'></p>
+                <button type="submit" class="btn btn-danger">Borrar</button>
+            </form>
+        </div>
+
+        <div class="card p-4 mb-3">
+            <h2>Borrar Todos los Registros</h2>
+            <form id="delete">
+                <p id='UsuariosBorrados'></p>
+                <button type="submit" class="btn btn-danger">Borrar Todo</button>
             </form>
         </div>
     </div>
@@ -115,4 +176,4 @@
         crossorigin="anonymous"></script>
 </body>
 </html>
-<script src="Registro.js"></script>
+<script src="index.js" ></script>
