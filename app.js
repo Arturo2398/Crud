@@ -25,7 +25,7 @@ app.use(sesion({
 var con=mysql.createConnection({
     host:"localhost",
     user:"root",
-    password:"Marmolejo01",
+    password:"n0m3l0",
     database:"6IV8",
     port:3306
 })
@@ -124,7 +124,7 @@ app.post('/agregarUsuario', async (req,res)=>{
 
         const checkUser = () => {
             return new Promise((resolve, reject) => {
-                con.query('SELECT * FROM usuario WHERE usuario = ?', [usuario], (err, respuesta) => {
+                con.query('SELECT * FROM usuario WHERE nombre = ?', [nombre], (err, respuesta) => {
                     if (err) reject(err);
                     resolve(respuesta);
                 });
@@ -138,8 +138,8 @@ app.post('/agregarUsuario', async (req,res)=>{
 
         const insertUser = () => {
             return new Promise((resolve, reject) => {
-                con.query('INSERT INTO usuario (usuario, nombre, apellidopaterno, apellidomaterno, edad, posición, altura, peso, nacionalidad, contraseña) VALUES (?,?,?,?,?,?,?,?,?,?)',
-                    [usuario, nombre, apellidop, apellidom, edad, posicion, altura, peso, nacionalidad, hashedPassword],
+                con.query('INSERT INTO usuario (nombre, edad, pelicula, deporte, cancion, artista, materia, profe) VALUES (?,?,?,?,?,?,?,?)',
+                    [nombre, edad, pelicula, deporte, cancion, artista, materia, profe, hashedPassword],
                     (err, respuesta) => {
                         if (err) reject(err);
                         resolve(respuesta);
@@ -154,9 +154,9 @@ app.post('/agregarUsuario', async (req,res)=>{
         return res.status(202).send({ 
             message: 'ok', 
             nombre: ` ${nombre}`, 
-            apellidopaterno: `${apellidop}`, 
-            nacionalidad: `${nacionalidad}`,
-            redireccion: "/",
+            edad: `${edad}`, 
+            deporte: `${deporte}`,
+            redireccion: '/Crud',
             token: token
         });
 })
@@ -280,7 +280,7 @@ app.put('/login', async (req, res) => {
 
         // Obtener usuario y contraseña hasheada
         const [user] = await con.promise().query(
-            'SELECT id, contraseña FROM usuario WHERE usuario = ?', 
+            'SELECT id, profe FROM usuario WHERE usuario = ?', 
             [usuario]
         );
 
@@ -300,7 +300,7 @@ app.put('/login', async (req, res) => {
         return res.status(200).send({ 
             message: 'ok', 
             respuesta: user[0].id, 
-            redireccion: "/", 
+            redireccion: '/Crud', 
             token: token 
         });
     } catch (error) {
@@ -309,7 +309,7 @@ app.put('/login', async (req, res) => {
     }
 });
 //******************************************************************************************************************* */
-app.put('/verificar-sesion', async (req, res) => {
+app.put('/verificarsesion', async (req, res) => {
     try {       
         
         const token = req.body.usuario;

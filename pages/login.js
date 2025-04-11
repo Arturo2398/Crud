@@ -1,7 +1,7 @@
 const auth= async() => {
     const sesion = sessionStorage.getItem("usuario");
     
-        const consulta = await fetch("/verificar-sesion", {
+        const consulta = await fetch("/verificarsesion", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -24,7 +24,7 @@ const auth= async() => {
             method: "PUT",
             body: JSON.stringify({
                 usuario: event.target.usuario.value,
-                password: event.target.password.value
+                profe: event.target.profe.value
             }),
             headers: {
                 "Content-Type": "application/json"
@@ -36,7 +36,7 @@ const auth= async() => {
         alert("Inicio de sesión exitoso");
         document.getElementById("nuevoUsuario").innerHTML = `Aspirante con id ${responseJson.respuesta} inicio sesión correctamente`;
         sessionStorage.setItem("usuario", responseJson.token);
-        window.location.href = "/";
+        window.location.href = "/Crud";
     }else{
         alert("Error al iniciar Sesión");
         nuevoUsuario.innerHTML = "La servidor tuvo problemas para el inicio de sesión: "+responseJson.message;

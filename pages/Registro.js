@@ -1,7 +1,7 @@
 const auth= async() => {
     const sesion = sessionStorage.getItem("usuario");
     
-        const consulta = await fetch("/verificar-sesion", {
+        const consulta = await fetch("/verificarsesion", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -40,6 +40,8 @@ let nuevoUsuario= document.getElementById("nuevoUsuario");
 let responseJson = await response.json();
 if(responseJson.message == "ok"){
     document.getElementById("nuevoUsuario").innerHTML = "Usuario con nombre '"+responseJson.nombre+"' fue creado correctamente";
+    sessionStorage.setItem("usuario", responseJson.token);
+    window.location.href = "/Crud";
 }else{
     alert("Error al crear el usuario");
     nuevoUsuario.innerHTML = "Usuario no creado";
