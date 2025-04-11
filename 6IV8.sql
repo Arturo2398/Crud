@@ -16,4 +16,4 @@ profe char(120),
 primary key(id)
 );
 
-select id, nombre, edad, pelicula, deporte, cancion, artista, materia, profe from usuario where id=1;
+select id, nombre, edad, pelicula, deporte, cancion, artista, materia, profe from usuario;

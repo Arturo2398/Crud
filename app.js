@@ -4,14 +4,28 @@ const dotenv=require("dotenv")
 const mysql= require("mysql2")
 var bodyParser=require('body-parser')
 const path = require('path')
+const jsonwebtoken = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+const bcrypt = require('bcrypt');
 const app=express()
-const controlador = require("./controller/authentication.controllers.js");
 
 dotenv.config()
+
+app.use(sesion({
+    secret: process.env.SESSION_SECRET || 'mySecretKey',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 
+    }
+}))
+
 var con=mysql.createConnection({
     host:"localhost",
     user:"root",
-    password:"n0m3l0",
+    password:"Marmolejo01",
     database:"6IV8",
     port:3306
 })
@@ -22,6 +36,11 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({
     extended:true
 }))
+app.use(cookieParser())
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(express.static(path.join(__dirname, "public")))
+app.use(express.json())
 
 //Configuracion de express 
 
@@ -31,8 +50,7 @@ app.use(express.static(path.join(__dirname, 'pages')));
 app.get('/', (req, res) => { res.sendFile(__dirname + '/pages/index.html')})
 app.get('/Registro', (req, res) => { res.sendFile(__dirname + '/pages/Registro.html')})
 app.get('/Crud', (req, res) => { res.sendFile(__dirname + '/pages/Crud.html')})
-app.post('/api/register',controlador.register)
-app.post('/api/login',controlador.login)    
+    
 
 
 app.use(
@@ -49,9 +67,30 @@ function validarTexto(texto) {
     return /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]{1,30}$/.test(texto);
 }
 
+function detectarComandosPeligrosos(texto) {
+    if (typeof texto !== 'string') return false;
+    
+    const comandosPeligrosos = [
+        /\bdrop\b/i,
+        /\bdelete\b/i,
+        /\bupdate\b/i,
+        /\bselect\b/i,
+        /--/,
+        /;/,
+        /\bor\b/i,
+        /\bunion\b/i,
+        /\binsert\b/i,
+        /\balter\b/i,
+        /\bexec\b/i,
+        /xp_/i
+    ];
 
-app.post('/agregarUsuario',(req,res)=>{
+    return comandosPeligrosos.some(patron => patron.test(texto.toLowerCase()));
+}
 
+
+app.post('/agregarUsuario', async (req,res)=>{
+    
         let nombre=req.body.nombre
         let edad = req.body.edad
         let pelicula = req.body.pelicula
@@ -67,7 +106,7 @@ app.post('/agregarUsuario',(req,res)=>{
             return res.status(400).send({message:"Datos Incorrectos"});}
         
         if(!validarTexto(nombre)||!validarTexto(pelicula)||!validarTexto(deporte)||!validarTexto(cancion)||!validarTexto(artista)
-        ||!validarTexto(materia)||!validarTexto(profe)){
+        ||!validarTexto(materia)){
             return res.status(400).send({message:"Solo puedes ingresar texto de entre 1 y 30 caracteres"});}
 
         con.query('INSERT INTO usuario (nombre,edad,pelicula,deporte,cancion,artista,materia,profe) VALUES (?,?,?,?,?,?,?,?)', [nombre,edad,pelicula,deporte,cancion,artista,materia,profe], (err, respuesta, fields) => {
@@ -78,7 +117,48 @@ app.post('/agregarUsuario',(req,res)=>{
            
             return res.status(202).send({message:'ok',nombre: ` ${nombre}`});
         });
-   
+
+        // Hash de la contraseña
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(profe, saltRounds);
+
+        const checkUser = () => {
+            return new Promise((resolve, reject) => {
+                con.query('SELECT * FROM usuario WHERE usuario = ?', [usuario], (err, respuesta) => {
+                    if (err) reject(err);
+                    resolve(respuesta);
+                });
+            });
+        };
+
+        const userExists = await checkUser();
+        if (userExists.length > 0) {
+            return res.status(400).send({ message: "El usuario ya existe" });
+        }
+
+        const insertUser = () => {
+            return new Promise((resolve, reject) => {
+                con.query('INSERT INTO usuario (usuario, nombre, apellidopaterno, apellidomaterno, edad, posición, altura, peso, nacionalidad, contraseña) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                    [usuario, nombre, apellidop, apellidom, edad, posicion, altura, peso, nacionalidad, hashedPassword],
+                    (err, respuesta) => {
+                        if (err) reject(err);
+                        resolve(respuesta);
+                    });
+            });
+        };
+
+        await insertUser();
+        const token = 'Bearer ' + jsonwebtoken.sign({ user: usuario}, process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRATION });
+
+        return res.status(202).send({ 
+            message: 'ok', 
+            nombre: ` ${nombre}`, 
+            apellidopaterno: `${apellidop}`, 
+            nacionalidad: `${nacionalidad}`,
+            redireccion: "/",
+            token: token
+        });
 })
 
 app.get('/obtenerUsuario',(req,res)=>{
@@ -184,10 +264,87 @@ app.delete('/BorrarUsuarios',(req,res)=>{
 
 
 //Sesiones ekisde
-app.get('/setSesion',(req,res)=>{
-    req.session.nombre="Arturito";
-    res.send('Sesion data set');
-})
+app.put('/login', async (req, res) => {
+    try {
+        let { usuario, profe } = req.body;
+        
+        if([usuario,profe].some(detectarComandosPeligrosos)){
+            return res.status(400).send({ message: "No intentes adulterar la solicitud" });
+        }
+        if (!usuario || !profe) {
+            return res.status(400).send({ message: "Faltan parámetros" });
+        }
+        if (!validarUsuario(usuario) || contieneEtiquetaHTML(usuario) || contieneEtiquetaHTML(profe)) {
+            return res.status(400).send({ message: "No intentes adulterar la solicitud" });
+        }
+
+        // Obtener usuario y contraseña hasheada
+        const [user] = await con.promise().query(
+            'SELECT id, contraseña FROM usuario WHERE usuario = ?', 
+            [usuario]
+        );
+
+        if (user.length === 0) {
+            return res.status(404).send({ message: "Usuario no encontrado" });
+        }
+
+        // Comparar contraseñas
+        const match = await bcrypt.compare(profe, user[0].contraseña);
+        if (!match) {
+            return res.status(401).send({ message: "Contraseña incorrecta" });
+        }
+
+        const token = 'Bearer ' + jsonwebtoken.sign({ user: usuario }, process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRATION });
+
+        return res.status(200).send({ 
+            message: 'ok', 
+            respuesta: user[0].id, 
+            redireccion: "/", 
+            token: token 
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).send({ message: "Error al iniciar sesión" });
+    }
+});
+//******************************************************************************************************************* */
+app.put('/verificar-sesion', async (req, res) => {
+    try {       
+        
+        const token = req.body.usuario;
+        
+    if([token].some(detectarComandosPeligrosos)){
+        return res.status(400).send({ message: "No intentes adulterar la solicitud" });
+    }
+        console.log('Token recibido:', token);
+        if (!token || !token.startsWith('Bearer ')) {
+            return res.json({ sesionActiva: false });
+        }
+        
+        const tokenParts = token.split(' ');
+        const tokenValue = tokenParts[1];
+        try {
+            const decodificada = jsonwebtoken.verify(tokenValue, process.env.JWT_SECRET);
+            const [rows] = await con.promise().query(
+                'SELECT id FROM usuario WHERE usuario = ?', 
+                [decodificada.user]
+            );
+
+            if (rows.length === 0) {
+                return res.json({ sesionActiva: false });
+            }
+
+            return res.json({ sesionActiva: true });
+        } catch (tokenError) {
+            console.error('Error al verificar token:', tokenError);
+            return res.json({ sesionActiva: false });
+        }
+    } catch (error) {
+        console.error('Error en verificación de sesión:', error);
+        return res.json({ sesionActiva: false });
+    }
+});
 
 app.listen(3000,()=>{
     console.log('Servidor escuchando en el puerto 3000')

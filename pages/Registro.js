@@ -1,4 +1,23 @@
-console.log("Error");
+const auth= async() => {
+    const sesion = sessionStorage.getItem("usuario");
+    
+        const consulta = await fetch("/verificar-sesion", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                usuario: sesion
+            })
+        });
+        
+        const consultaJson = await consulta.json();
+        console.log(consultaJson);
+        if(consultaJson.sesionActiva===true|| consultaJson.sesionActiva === undefined){
+            window.location.href = "/";
+        }}
+    auth();
+
 document.getElementById("create").addEventListener("submit", async(event)=>{
     event.preventDefault();
     let response = await fetch("/agregarUsuario", {
