@@ -1,351 +1,334 @@
-const express = require("express")
-const sesion = require("express-session")
-const dotenv=require("dotenv")
-const mysql= require("mysql2")
-var bodyParser=require('body-parser')
-const path = require('path')
-const jsonwebtoken = require('jsonwebtoken');
+const express = require("express");
+const mysql = require("mysql2");
+const bodyParser = require("body-parser");
+const { body, param, validationResult } = require("express-validator");
+const bcrypt = require("bcrypt");
+const SALT_ROUNDS = 10;
+const app = express();
+const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
-const bcrypt = require('bcrypt');
-const app=express()
+app.use(express.static('public'));
+const JWT_SECRET = 'tu_clave_secreta_muy_segura';
+const JWT_EXPIRY = '2h';
 
-dotenv.config()
+const pool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+});
 
-app.use(sesion({
-    secret: process.env.SESSION_SECRET || 'mySecretKey',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 
+app.use(cookieParser());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+// Añadir estas importaciones al principio del archivo app.js
+const saltRounds = 10;
+// Añade esto a tu app.js, justo antes de las demás rutas
+app.get('/', (req, res) => {
+    res.sendFile('index.html', { root: './public' });
+});
+
+app.get('/index.html', (req, res) => {
+    res.sendFile('index.html', { root: './public' });
+});
+// Middleware para verificar token JWT (añadir después de las configuraciones del app)
+const authenticateJWT = (req, res, next) => {
+    const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+    
+    if (!token) {
+        return res.status(401).json({ error: "Acceso no autorizado" });
     }
-}))
 
-var con=mysql.createConnection({
-    host:"localhost",
-    user:"root",
-    password:"n0m3l0",
-    database:"6IV8",
-    port:3306
-})
-con.connect();
+    try {
+        const user = jwt.verify(token, JWT_SECRET);
+        req.user = user;
+        next();
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: "Sesión expirada, por favor inicie sesión nuevamente" });
+        }
+        return res.status(403).json({ error: "Token inválido" });
+    }
+};
 
-app.use(bodyParser.json())
+// Registro de usuarios
+app.post(
+    "/register",
+    [
+        body("nombre")
+            .trim()
+            .isLength({ min: 2, max: 50 }).withMessage("El nombre debe tener entre 2 y 50 caracteres")
+            .matches(/^[A-Za-zÁÉÍÓÚÑáéíóúñ\s]+$/).withMessage("El nombre solo puede contener letras y espacios")
+            .escape(),  
+        body("correo")
+            .isEmail().withMessage("Ingrese un correo electrónico válido")
+            .normalizeEmail()
+            .custom(async (value) => {
+                // Verificar que el correo no exista ya
+                const [results] = await pool.promise().query("SELECT * FROM usuarios WHERE correo = ?", [value]);
+                if (results.length > 0) {
+                    throw new Error("El correo ya está registrado");
+                }
+                return true;
+            }),
+        body("password")
+            .isLength({ min: 8 }).withMessage("La contraseña debe tener al menos 8 caracteres")
+            .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage("La contraseña debe incluir al menos una letra mayúscula, una minúscula y un número")
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ 
+                error: "Datos inválidos", 
+                detalles: errors.array().map(err => ({ campo: err.param, mensaje: err.msg }))
+            });
+        }
 
-app.use(bodyParser.urlencoded({
-    extended:true
-}))
-app.use(cookieParser())
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true }))
-app.use(express.static(path.join(__dirname, "public")))
-app.use(express.json())
+        try {
+            const { nombre, correo, password } = req.body;
+            
+            // Encriptar la contraseña
+            const hash = await bcrypt.hash(password, saltRounds);
+            
+            // Usar parámetros para evitar inyección SQL
+            const [result] = await pool.promise().query(
+                "INSERT INTO usuarios (nombre, correo, password) VALUES (?, ?, ?)",
+                [nombre, correo, hash]
+            );
+            
+            res.json({ success: true, message: "Usuario registrado exitosamente" });
+        } catch (error) {
+            console.error("Error al registrar usuario:", error);
+            res.status(500).json({ error: "Error en el servidor al registrar usuario" });
+        }
+    }
+);
 
-//Configuracion de express 
+// Ruta para login
+app.post(
+    "/login",
+    [
+        body("correo").isEmail().normalizeEmail(),
+        body("password").isLength({ min: 1 })
+    ],
+    (req, res) => {
+        console.log("Intento de login:", req.body.correo);
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: "Datos inválidos", detalles: errors.array() });
+        }
 
-app.use(express.static(path.join(__dirname, 'pages')));
+        const { correo, password } = req.body;
 
-//RUTAS
-app.get('/', (req, res) => { res.sendFile(__dirname + '/pages/index.html')})
-app.get('/Registro', (req, res) => { res.sendFile(__dirname + '/pages/Registro.html')})
-app.get('/Crud', (req, res) => { res.sendFile(__dirname + '/pages/Crud.html')})
-    
-
-
-app.use(
-    sesion({
-        secret: 'secret',
-        resave: false,
-        saveUninitialized: false,
-    })
-)
-
-function etiqueta (texto) {
-    return /<[^>]+>/.test(texto); }
-function validarTexto(texto) {
-    return /^[a-zA-ZÁÉÍÓÚáéíóúÑñ\s]{1,30}$/.test(texto);
-}
-
-function detectarComandosPeligrosos(texto) {
-    if (typeof texto !== 'string') return false;
-    
-    const comandosPeligrosos = [
-        /\bdrop\b/i,
-        /\bdelete\b/i,
-        /\bupdate\b/i,
-        /\bselect\b/i,
-        /--/,
-        /;/,
-        /\bor\b/i,
-        /\bunion\b/i,
-        /\binsert\b/i,
-        /\balter\b/i,
-        /\bexec\b/i,
-        /xp_/i
-    ];
-
-    return comandosPeligrosos.some(patron => patron.test(texto.toLowerCase()));
-}
-
-
-app.post('/agregarUsuario', async (req,res)=>{
-    
-        let nombre=req.body.nombre
-        let edad = req.body.edad
-        let pelicula = req.body.pelicula
-        let deporte = req.body.deporte
-        let cancion = req.body.cancion
-        let artista = req.body.artista
-        let materia = req.body.materia
-        let profe = req.body.profe
-
-        edad = parseInt(edad);
-        if(etiqueta(nombre)||etiqueta(pelicula)||etiqueta(deporte)||etiqueta(cancion)||etiqueta(artista)||etiqueta(materia)
-            ||etiqueta(profe)||isNaN(edad)){
-            return res.status(400).send({message:"Datos Incorrectos"});}
-        
-        if(!validarTexto(nombre)||!validarTexto(pelicula)||!validarTexto(deporte)||!validarTexto(cancion)||!validarTexto(artista)
-        ||!validarTexto(materia)){
-            return res.status(400).send({message:"Solo puedes ingresar texto de entre 1 y 30 caracteres"});}
-
-        con.query('INSERT INTO usuario (nombre,edad,pelicula,deporte,cancion,artista,materia,profe) VALUES (?,?,?,?,?,?,?,?)', [nombre,edad,pelicula,deporte,cancion,artista,materia,profe], (err, respuesta, fields) => {
+        // Buscar usuario por correo
+        pool.query("SELECT * FROM usuarios WHERE correo = ?", [correo], (err, results) => {
             if (err) {
-                console.log("Error al conectar", err);
-                return res.status(500).send({message:"Error al conectar"});
+                console.error("Error al buscar usuario:", err);
+                return res.status(500).json({ error: "Error en el servidor" });
             }
-           
-            return res.status(202).send({message:'ok',nombre: ` ${nombre}`});
-        });
 
-        // Hash de la contraseña
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(profe, saltRounds);
+            if (results.length === 0) {
+                return res.status(401).json({ error: "Usuario no registrado. Por favor, regístrese primero." });
+            }
 
-        const checkUser = () => {
-            return new Promise((resolve, reject) => {
-                con.query('SELECT * FROM usuario WHERE nombre = ?', [nombre], (err, respuesta) => {
-                    if (err) reject(err);
-                    resolve(respuesta);
+            const usuario = results[0];
+
+            // Verificar contraseña
+            bcrypt.compare(password, usuario.password, (err, match) => {
+                if (err) {
+                    console.error("Error al verificar contraseña:", err);
+                    return res.status(500).json({ error: "Error en el servidor" });
+                }
+
+                if (!match) {
+                    return res.status(401).json({ error: "Correo o contraseña incorrectos" });
+                }
+                
+                const token = jwt.sign(
+                    { 
+                        id: usuario.id_usuario, 
+                        correo: usuario.correo,
+                        nombre: usuario.nombre
+                    }, 
+                    JWT_SECRET,
+                    { expiresIn: JWT_EXPIRY }
+                );
+
+                res.cookie('token', token, {
+                    httpOnly: true,         // No accesible vía JavaScript
+                    secure: process.env.NODE_ENV === 'production', // Solo HTTPS en producción
+                    sameSite: 'strict',     // Protección CSRF
+                    maxAge: 7200000         // 2 horas en milisegundos
+                });
+                // Enviar datos básicos del usuario (sin la contraseña)
+                res.json({
+                    id_usuario: usuario.id_usuario,
+                    nombre: usuario.nombre,
+                    correo: usuario.correo,
+                    token: token
                 });
             });
-        };
-
-        const userExists = await checkUser();
-        if (userExists.length > 0) {
-            return res.status(400).send({ message: "El usuario ya existe" });
-        }
-
-        const insertUser = () => {
-            return new Promise((resolve, reject) => {
-                con.query('INSERT INTO usuario (nombre, edad, pelicula, deporte, cancion, artista, materia, profe) VALUES (?,?,?,?,?,?,?,?)',
-                    [nombre, edad, pelicula, deporte, cancion, artista, materia, profe, hashedPassword],
-                    (err, respuesta) => {
-                        if (err) reject(err);
-                        resolve(respuesta);
-                    });
-            });
-        };
-
-        await insertUser();
-        const token = 'Bearer ' + jsonwebtoken.sign({ user: usuario}, process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRATION });
-
-        return res.status(202).send({ 
-            message: 'ok', 
-            nombre: ` ${nombre}`, 
-            edad: `${edad}`, 
-            deporte: `${deporte}`,
-            redireccion: '/Crud',
-            token: token
         });
-})
-
-app.get('/obtenerUsuario',(req,res)=>{
-    con.query('SELECT * from usuario', (err, respuesta, fields) => {
-        if (err) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al conectar"});
-        }
-        console.log(respuesta)
-        return res.status(202).send({message: 'ok',usuarios: respuesta, edad: respuesta, pelicula: respuesta, deporte: respuesta, cancion: respuesta, artista: respuesta, materia: respuesta, profe: respuesta});
-    });
-
-})
-app.put('/obtenerUnUsuario',(req,res)=>{
-    let id=req.body.id
-    if (!id) {
-        return res.status(400).send({ message: "Faltan parámetros" });
     }
-    if (isNaN(id)) {
-        return res.status(400).send({ message: "No intentes adulterar la solicitud" });
-    }
-    con.query('SELECT nombre, edad, pelicula, deporte, cancion, artista, materia, profe from usuario WHERE id= (?)',[id], (err, respuesta, fields) => {
-        if (err) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al conectar"});
-        }
-        console.log(respuesta)
-        return res.status(202).send({message: 'ok',usuarios: respuesta, edad: respuesta, pelicula: respuesta, deporte: respuesta, cancion: respuesta, artista: respuesta, materia: respuesta, profe: respuesta});
-    });
+);
 
-})
-
-app.put('/editarUsuario',(req,res)=>{
-    let id=req.body.id
-    let nombre=req.body.nombre
-    let edad = req.body.edad
-    let pelicula = req.body.pelicula
-    let deporte = req.body.deporte
-    let cancion = req.body.cancion
-    let artista = req.body.artista
-    let materia = req.body.materia
-    let profe = req.body.profe
-
-    if(!id ||!nombre ||!edad ||!pelicula ||!deporte ||!cancion ||!artista ||!materia ||!profe){
-        return res.status(400).send({ message: "Faltan parámetros" });
-    }
-
-    if(isNaN(id)|| etiqueta(nombre)||etiqueta(pelicula)||etiqueta(deporte)||etiqueta(cancion)||etiqueta(artista)||etiqueta(materia)
-        ||etiqueta(profe)||isNaN(edad)||!validarTexto(nombre)||!validarTexto(pelicula)||!validarTexto(deporte)||!validarTexto(cancion)||!validarTexto(artista)
-    ||!validarTexto(materia)||!validarTexto(profe)){
-        return res.status(400).send({ message: "no intente adulterar los parametros" });
-    }
-    con.query('SELECT nombre,edad,pelicula,deporte,cancion,artista,materia,profe FROM usuario WHERE id=(?)',[id] , (error, response,campos) => {
-        if (error) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al encontrar al usuario"});
-            
-        }
-    if(response.length==0){
-        return res.status(404).send({message:"No se encontro el usuario"});
-    }
-    con.query('UPDATE usuario SET nombre = (?), edad = (?), pelicula = (?), deporte = (?), cancion = (?), artista = (?), materia = (?), profe = (?) WHERE id =(?)',[nombre,edad,pelicula,deporte,cancion,artista,materia,profe,id], (err, respuesta, fields) => {
-        if (err) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al actualizar registro"});
-        }
-        console.log(respuesta.info)
-        return res.status(202).send({message: 'ok',respuesta : respuesta.info});
-    });});
-
-})
-app.delete('/BorrarUnUsuario',(req,res)=>{
-    let id=req.body.id
-
-    if (!id||isNaN(id)) {
-        return res.status(400).send({ message: "Faltan parámetros o el id no es un número" });
-    }
-
-    con.query('DELETE usuario FROM usuario WHERE id =(?)',[id], (err, respuesta, fields) => {
-        if (err) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al conectar"});
-        }
-        console.log(respuesta)
-        return res.status(202).send({message: 'ok',respuesta : respuesta.affectedRows});
-    });
-
-})
-
-app.delete('/BorrarUsuarios',(req,res)=>{
-    
-    con.query('DELETE usuario FROM usuario;', (err, respuesta, fields) => {
-        if (err) {
-            console.log("Error al conectar", err);
-            return res.status(500).send({message:"Error al conectar"});
-        }
-        console.log(respuesta)
-        return res.status(202).send({message: 'ok',respuesta : respuesta.affectedRows});
-    });
-
-})
-
-
-
-//Sesiones ekisde
-app.put('/login', async (req, res) => {
-    try {
-        let { usuario, profe } = req.body;
-        
-        if([usuario,profe].some(detectarComandosPeligrosos)){
-            return res.status(400).send({ message: "No intentes adulterar la solicitud" });
-        }
-        if (!usuario || !profe) {
-            return res.status(400).send({ message: "Faltan parámetros" });
-        }
-        if (!validarUsuario(usuario) || contieneEtiquetaHTML(usuario) || contieneEtiquetaHTML(profe)) {
-            return res.status(400).send({ message: "No intentes adulterar la solicitud" });
-        }
-
-        // Obtener usuario y contraseña hasheada
-        const [user] = await con.promise().query(
-            'SELECT id, profe FROM usuario WHERE usuario = ?', 
-            [usuario]
-        );
-
-        if (user.length === 0) {
-            return res.status(404).send({ message: "Usuario no encontrado" });
-        }
-
-        // Comparar contraseñas
-        const match = await bcrypt.compare(profe, user[0].contraseña);
-        if (!match) {
-            return res.status(401).send({ message: "Contraseña incorrecta" });
-        }
-
-        const token = 'Bearer ' + jsonwebtoken.sign({ user: usuario }, process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRATION });
-
-        return res.status(200).send({ 
-            message: 'ok', 
-            respuesta: user[0].id, 
-            redireccion: '/Crud', 
-            token: token 
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).send({ message: "Error al iniciar sesión" });
-    }
+// Ruta para cerrar sesión
+app.post('/logout', (req, res) => {
+    console.log("Petición de logout recibida");
+    res.clearCookie('token');
+    res.json({ message: "Sesión cerrada correctamente" });
 });
-//******************************************************************************************************************* */
-app.put('/verificarsesion', async (req, res) => {
-    try {       
-        
-        const token = req.body.usuario;
-        
-    if([token].some(detectarComandosPeligrosos)){
-        return res.status(400).send({ message: "No intentes adulterar la solicitud" });
-    }
-        console.log('Token recibido:', token);
-        if (!token || !token.startsWith('Bearer ')) {
-            return res.json({ sesionActiva: false });
-        }
-        
-        const tokenParts = token.split(' ');
-        const tokenValue = tokenParts[1];
-        try {
-            const decodificada = jsonwebtoken.verify(tokenValue, process.env.JWT_SECRET);
-            const [rows] = await con.promise().query(
-                'SELECT id FROM usuario WHERE usuario = ?', 
-                [decodificada.user]
-            );
 
-            if (rows.length === 0) {
-                return res.json({ sesionActiva: false });
+// Ruta para agregar pokémon (protegida)
+app.post(
+    "/agregarPokemon",
+    authenticateJWT, // Middleware de autenticación
+    [
+        body("nombre").trim().escape().isLength({ min: 1, max: 50 }),
+        body("especie").trim().escape().isLength({ min: 1, max: 50 }),
+        body("tipo").trim().escape().isLength({ min: 1, max: 50 }),
+        body("nivel").isInt({ min: 1, max: 100 }),
+        body("habilidad").trim().escape().isLength({ min: 1, max: 50 }),
+        body("entrenador").trim().escape().isLength({ min: 1, max: 50 }),
+        body("edad").isInt({ min: 1, max: 120 }),
+        body("region").trim().escape().isLength({ min: 1, max: 50 }),
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: "Datos inválidos", detalles: errors.array() });
+        }
+
+        try {
+            const { nombre, especie, tipo, nivel, habilidad, entrenador, edad, region } = req.body;
+            const id_usuario = req.user.id; // Obtenido del token JWT verificado
+            
+            const [result] = await pool.promise().query(
+                "INSERT INTO pokemon (nombre, especie, tipo, nivel, habilidad, entrenador, edad, region, id_usuario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [nombre, especie, tipo, nivel, habilidad, entrenador, edad, region, id_usuario]
+            );
+            
+            res.json({ 
+                success: true, 
+                message: `Pokémon ${nombre} registrado exitosamente.`,
+                id: result.insertId
+            });
+        } catch (error) {
+            console.error("Error en la inserción:", error);
+            res.status(500).json({ error: "Error al registrar Pokémon." });
+        }
+    }
+);
+
+// Ruta para eliminar Pokémon
+app.delete(
+    "/eliminarPokemon/:id",
+    authenticateJWT,
+    [param("id").isInt({ min: 1 })],
+    (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: "ID inválido", detalles: errors.array() });
+        }
+
+        const id = parseInt(req.params.id);
+        const id_usuario = req.user.id;
+        const query = "DELETE FROM pokemon WHERE id = ? AND id_usuario = ?";
+
+        pool.query(query, [id, id_usuario], (err, result) => {
+            if (err) {
+                console.error("Error al eliminar Pokémon:", err);
+                return res.status(500).json({ error: "Error al eliminar Pokémon" });
             }
 
-            return res.json({ sesionActiva: true });
-        } catch (tokenError) {
-            console.error('Error al verificar token:', tokenError);
-            return res.json({ sesionActiva: false });
-        }
-    } catch (error) {
-        console.error('Error en verificación de sesión:', error);
-        return res.json({ sesionActiva: false });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Pokémon no encontrado." });
+            }
+
+            res.json({ success: true, message: "Pokémon eliminado exitosamente" });
+        });
     }
+);
+
+app.get("/obtenerPokemones", authenticateJWT, (req, res) => {
+    const id_usuario = req.user.id;  // Obtener el ID del usuario del token JWT
+    let query = "SELECT * FROM pokemon WHERE id_usuario = ?";
+    let params = [id_usuario];
+
+    pool.query(query, params, (err, results) => {
+        if (err) {
+            console.error("Error al obtener Pokemones:", err);
+            return res.status(500).json({ error: "Error al obtener lista de Pokemones" });
+        }
+        res.json(results);
+    });
 });
 
-app.listen(3000,()=>{
-    console.log('Servidor escuchando en el puerto 3000')
-})
+app.get('/obtenerPokemon/:id',authenticateJWT, (req, res) => {
+    const id = req.params.id;
+    const id_usuario = req.user.id;
+    const query = "SELECT * FROM pokemon WHERE id = ? AND id_usuario = ?";
+
+    pool.query(query, [id, id_usuario], (err, results) => {
+        if (err) {
+            console.error("Error en la consulta SQL:", err);
+            return res.status(500).json({ error: "Error al obtener el Pokémon" });
+        }
+
+        if (results.length === 0) {
+            console.log("No se encontró el Pokémon con ID:", id);
+            return res.status(404).json({ error: "Pokémon no encontrado" });
+        }
+
+        res.json(results[0]);
+    });
+});
+
+app.put(
+    "/actualizarPokemon/:id",
+    authenticateJWT,
+    [
+        param("id").isInt({ min: 1 }),
+        body("nombre").trim().escape().isLength({ min: 1, max: 50 }),
+        body("especie").trim().escape().isLength({ min: 1, max: 50 }),
+        body("tipo").trim().escape().isLength({ min: 1, max: 50 }),
+        body("nivel").isInt({ min: 1, max: 100 }),
+        body("habilidad").trim().escape().isLength({ min: 1, max: 50 }),
+        body("entrenador").trim().escape().isLength({ min: 1, max: 50 }),
+        body("edad").isInt({ min: 1, max: 120 }),
+        body("region").trim().escape().isLength({ min: 1, max: 50 }),
+    ],
+    (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: "Datos inválidos", detalles: errors.array() });
+        }
+
+        const id = parseInt(req.params.id);
+        const { nombre, especie, tipo, nivel, habilidad, entrenador, edad, region } = req.body;
+        const id_usuario = req.user.id;
+
+        const query = "UPDATE pokemon SET nombre = ?, especie = ?, tipo = ?, nivel = ?, habilidad = ?, entrenador = ?, edad = ?, region = ? WHERE id = ? AND id_usuario = ?";
+        
+        pool.query(query, [nombre, especie, tipo, nivel, habilidad, entrenador, edad, region, id, id_usuario], (err, result) => {
+            if (err) {
+                console.error("Error al actualizar Pokémon:", err);
+                return res.status(500).json({ error: "Error al actualizar Pokémon." });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Pokémon no encontrado." });
+            }
+
+            res.json({ success: true, message: `Pokémon con ID ${id} actualizado exitosamente.` });
+        });
+    }
+);
+
+
+
+// Iniciar servidor
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor escuchando en el puerto ${PORT}`);
+});

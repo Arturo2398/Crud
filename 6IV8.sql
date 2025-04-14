@@ -1,19 +1,24 @@
-drop database 6IV8;
-create database 6IV8;
+CREATE DATABASE IF NOT EXISTS pokemones;
+USE pokemones;
 
-use 6IV8;
-
-create table usuario (
-id integer auto_increment,
-nombre char(120),
-edad char(120),
-pelicula char(120),
-deporte char(120),
-cancion char(120),
-artista char(120),
-materia char(120),
-profe char(120),
-primary key(id)
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+    correo VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    nombre VARCHAR(50) NOT NULL,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-select id, nombre, edad, pelicula, deporte, cancion, artista, materia, profe from usuario;
+CREATE TABLE IF NOT EXISTS pokemon (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL,
+    especie VARCHAR(50) NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+    nivel INT NOT NULL CHECK (nivel BETWEEN 1 AND 100),
+    habilidad VARCHAR(50) NOT NULL,
+    entrenador VARCHAR(50) NOT NULL,
+    edad INT NOT NULL CHECK (edad BETWEEN 1 AND 120),
+    region VARCHAR(50) NOT NULL,
+    id_usuario INT,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario)
+);
